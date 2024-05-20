@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Todo List</title>
+    <style>
+      table {
+        width: 50%;
+        margin: 20px auto;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        padding: 8px;
+        text-align: left;
+        border: 1px solid #ddd;
+      }
+      th {
+        background-color: #f4f4f4;
+      }
+      form {
+        width: 50%;
+        margin: 20px auto;
+        display: flex;
+        justify-content: space-between;
+      }
+      input[type='text'] {
+        flex: 1;
+        padding: 8px;
+      }
+      input[type='submit'],
+      button {
+        padding: 8px;
+        margin-left: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 style="text-align: center">Todo List</h1>
+    <form id="todoForm">
+      <input type="text" id="todoName" placeholder="Enter todo name" required />
+      <input type="submit" value="Add Todo" />
+    </form>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="todoList"></tbody>
+    </table>
+
+    <script src="app.js"></script>
+  </body>
+</html>
