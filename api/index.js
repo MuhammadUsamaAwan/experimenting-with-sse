@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const redis = require('redis');
 
 const app = express();
 const PORT = 3000;
@@ -11,28 +12,32 @@ app.use(cors());
 // In-memory data store
 let todos = [];
 let currentId = 1;
-let clients = [];
+const publisher = redis.createClient();
+const subscriber = publisher.duplicate();
+
+publisher.connect();
+subscriber.connect();
 
 // SSE endpoint
-app.get('/todo-subscription', (req, res) => {
+app.get('/todo-subscription', async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
-  // Add client to clients array
-  clients.push(res);
+  const sendEvent = data => {
+    res.write(`data: ${data}\n\n`);
+  };
+
+  // Subscribe client to a Redis channel
+  await subscriber.subscribe('todo_channel', message => {
+    sendEvent(message);
+  });
 
   // Remove client when connection closes
-  req.on('close', () => {
-    clients = clients.filter(client => client !== res);
+  req.on('close', async () => {
+    await subscriber.unsubscribe('todo_channel');
   });
 });
-
-const sendEventToAll = data => {
-  clients.forEach(client => {
-    client.write(`data: ${JSON.stringify(data)}\n\n`);
-  });
-};
 
 // Read all
 app.get('/todos', (req, res) => {
@@ -50,28 +55,34 @@ app.get('/todos/:id', (req, res) => {
 });
 
 // Create
-app.post('/todos', (req, res) => {
+app.post('/todos', async (req, res) => {
   const todo = {
     id: currentId++,
     name: req.body.name,
   };
-  sendEventToAll({
-    action: 'CREATE',
-    data: todo,
-  });
+  await publisher.publish(
+    'todo_channel',
+    JSON.stringify({
+      action: 'CREATE',
+      data: todo,
+    })
+  );
   todos.push(todo);
   res.status(201).json(todo);
 });
 
 // Update
-app.put('/todos/:id', (req, res) => {
+app.put('/todos/:id', async (req, res) => {
   const todo = todos.find(t => t.id === parseInt(req.params.id));
   if (todo) {
     todo.name = req.body.name;
-    sendEventToAll({
-      action: 'UPDATE',
-      data: todo,
-    });
+    await publisher.publish(
+      'todo_channel',
+      JSON.stringify({
+        action: 'UPDATE',
+        data: todo,
+      })
+    );
     res.json(todo);
   } else {
     res.status(404).send('Todo not found');
@@ -79,13 +90,16 @@ app.put('/todos/:id', (req, res) => {
 });
 
 // Delete
-app.delete('/todos/:id', (req, res) => {
+app.delete('/todos/:id', async (req, res) => {
   const index = todos.findIndex(t => t.id === parseInt(req.params.id));
   if (index !== -1) {
-    sendEventToAll({
-      action: 'DELETE',
-      data: todos[index],
-    });
+    await publisher.publish(
+      'todo_channel',
+      JSON.stringify({
+        action: 'DELETE',
+        data: todos[index],
+      })
+    );
     todos.splice(index, 1);
     res.status(204).send();
   } else {
